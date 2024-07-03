@@ -1,0 +1,243 @@
+provider "aws" {
+  region  = "us-east-1"
+}
+resource "aws_instance" "main" {
+  ami           = "ami-0d191299f2822b1fa"
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "main"
+  }
+}
+resource "aws_vpc" "NEW" {
+  cidr_block       = "10.0.0.0/16"
+  instance_tenancy = "default"
+
+  tags = {
+    Name = "NEW"
+  }
+}
+# public subnets
+resource "aws_subnet" "Public-1" {
+  vpc_id     = aws_vpc.NEW.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "Public-1"
+  }
+}
+
+resource "aws_subnet" "Public-2" {
+  vpc_id     = aws_vpc.NEW.id
+  cidr_block = "10.0.2.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "Public-2"
+  }
+}
+
+resource "aws_subnet" "Public-3" {
+  vpc_id     = aws_vpc.NEW.id
+  cidr_block = "10.0.3.0/24"
+  availability_zone = "us-east-1c"
+
+  tags = {
+    Name = "Public-3"
+  }
+}
+
+# private subnets
+resource "aws_subnet" "Private-1" {
+  vpc_id     = aws_vpc.NEW.id
+  cidr_block = "10.0.4.0/24"
+  availability_zone = "us-east-1a"
+
+  tags = {
+    Name = "Private-1"
+  }
+}
+
+resource "aws_subnet" "Private-2" {
+  vpc_id     = aws_vpc.NEW.id
+  cidr_block = "10.0.5.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "Private-2"
+  }
+}
+
+resource "aws_subnet" "Private-3" {
+  vpc_id     = aws_vpc.NEW.id
+  cidr_block = "10.0.6.0/24"
+  availability_zone = "us-east-1c"
+
+  tags = {
+    Name = "Private-3"
+  }
+}
+resource "aws_internet_gateway" "internet_gateway" {
+  vpc_id = aws_vpc.NEW.id
+
+  tags = {
+    Name = "internet_gateway"
+  }
+}
+
+resource "aws_eip" "nat_eip" {
+  vpc = true # Set to true if the EIP is in a VPC
+
+  tags = {
+    Name = "nat_eip"
+  }
+}
+
+resource "aws_nat_gateway" "example" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.Private-1.id  
+
+  tags = {
+    Name = "example-nat-gw"
+  }
+}
+resource "aws_route_table" "root" {
+  vpc_id = aws_vpc.NEW.id
+
+  route = []
+
+  tags = {
+    Name = "root"
+  }
+}
+
+resource "aws_route_table_association" "newrootas" {
+  subnet_id      = aws_subnet.Public-1.id
+  route_table_id = aws_route_table.root.id
+}
+
+resource "aws_route_table_association" "lastrootas" {
+  gateway_id     = aws_internet_gateway.internet_gateway.id
+  route_table_id = aws_route_table.root.id
+}
+resource "aws_ebs_volume" "snapshot" {
+  availability_zone = "us-east-1a"
+  size              = 40
+
+  tags = {
+    Name = "HelloWorld"
+  }
+}
+
+resource "aws_ebs_snapshot" "example_snapshot" {
+  volume_id = aws_ebs_volume.snapshot.id
+
+  tags = {
+    Name = "HelloWorld_snap"
+  }
+}
+resource "aws_ebs_volume" "ebs" {
+  availability_zone = "us-east-1a" # Replace with your availability zone
+  size              = 10 # The size of the volume in GiBs
+
+  tags = {
+    Name = "MyEBSVolume"
+  }
+}
+resource "aws_s3_bucket" "buck" {
+  bucket = "my-tf-test-bucket3663"
+
+  tags = {
+    Name        = "My bucket"
+    Environment = "Dev"
+  }
+}
+resource "aws_db_instance" "myrds" {
+  allocated_storage    = 10
+  db_name              = "mydb"
+  engine               = "mysql"
+  engine_version       = "8.0"
+  instance_class       = "db.t3.micro"
+  username             = "foo"
+  password             = "foobarbaz"
+  parameter_group_name = "default.mysql8.0"
+  skip_final_snapshot  = true
+}
+resource "aws_route53_zone" "new_tera" {
+  name = "newtera.com"
+}
+
+resource "aws_route53_record" "www" {
+  zone_id = aws_route53_zone.new_tera.zone_id
+  name    = "www.newtera.com"
+  type    = "A"
+  ttl     = "300"
+  records = ["3.90.215.141"]
+}
+resource "aws_iam_role" "example_role" {
+  name = "example_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      },
+    ]
+  })
+
+  tags = {
+    Name = "ExampleRole"
+  }
+}
+resource "aws_ami" "example" {
+  name                = "terraform-example"
+  root_device_name    = "/dev/xvda"
+  imds_support        = "v2.0" 
+   ebs_block_device {
+    device_name = "/dev/xvda"
+    snapshot_id = "snap-054e39c169e8d7126"
+    volume_size = 10
+  }
+}
+resource "aws_sns_topic" "aws" {
+  name = "aws-sns-topic"
+  kms_master_key_id = "alias/aws/sns"
+}
+
+resource "aws_sns_topic" "user_updates" {
+  name                        = "aws-updates-topic.fifo"
+  fifo_topic                  = true
+  content_based_deduplication = true
+}
+#resource "aws_s3_bucket" "cloudtrail_logs" {
+ # bucket = "my-cloudtrail-logs-bucket" # Replace with your S3 bucket name
+ # force_destroy = true
+  #acl    = "private"
+#}
+resource "aws_cloudwatch_metric_alarm" "cpu_utilization_alarm" {
+  alarm_name          = "high-cpu-utilization"
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  evaluation_periods  = 2
+  metric_name         = "CPUUtilization"
+  namespace           = "AWS/EC2"
+  period              = 120
+  statistic           = "Average"
+  threshold           = 80
+  alarm_description   = "This metric monitors ec2 cpu utilization"
+  actions_enabled     = true
+
+  dimensions = {
+    InstanceId = "i-02c71e2106c9e0dac" # Replace with your EC2 instance ID
+  }
+
+  alarm_actions = [
+    "arn:aws:sns:us-east-1:992382599785:aws-sns-topic" # Replace with your SNS topic ARN
+  ]
+  insufficient_data_actions = []
+}
